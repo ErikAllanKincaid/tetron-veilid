@@ -1,0 +1,26 @@
+# tetron-veilid host inventory.
+#
+# Copy this file to hosts.conf (gitignored -- your real infra is your own
+# business) and edit. One host per line:
+#
+#   <name>  <target>
+#
+# <name> is a label used only within this tool (log lines, --host
+# arguments) -- it does not need to match the real hostname.
+#
+# <target> is either the literal word "local" (run commands directly on
+# this machine) or an SSH target (user@host, anything `ssh` itself accepts,
+# including a Host alias from your own ~/.ssh/config).
+#
+# Unlike tetron-relay (one shared server for a whole fleet), each entry
+# here is normally the SAME machine a tetron node already runs on -- you
+# run `tetron-veilid up` once per node that wants --veilid connectivity,
+# using "local" if this controller is that node, or an SSH target if it
+# is a different one. The SSH user needs passwordless sudo (or run as
+# root directly) since bringup writes to /usr/local/bin, /etc/tetron-veilid,
+# and installs a systemd unit.
+#
+# Lines starting with # are comments. Blank lines are ignored.
+
+#local  local
+#node2  ssh:user@node2.example.com

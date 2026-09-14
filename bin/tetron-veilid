@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# tetron-veilid: install a footgun-nodeid-target build of veilid-server as
+# a local companion daemon for tetron's external-daemon Veilid transport.
+# See README.md for prerequisites and a full walkthrough.
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../lib/common.sh
+source "$ROOT/lib/common.sh"
+# shellcheck source=../lib/veilid.sh
+source "$ROOT/lib/veilid.sh"
+
+require_cmd curl ssh scp
+
+usage() {
+	cat <<'EOF'
+usage:
+  tetron-veilid up --host <name> [--listen <addr:port>]
+  tetron-veilid status --host <name>
+  tetron-veilid down --host <name> [--purge]
+
+hosts.conf (copy hosts.conf.example) declares each <name> as "local" or an
+SSH target. Unlike tetron-relay (one shared server for a whole fleet),
+tetron-veilid's target is normally the SAME machine each tetron node
+already runs on -- run `up` once per node that wants --veilid
+connectivity, not once for a whole fleet.
+
+--listen defaults to 127.0.0.1:5959 (loopback-only). The wire protocol
+carries no authentication of any kind (see
+tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md section 3) --
+only widen this if you specifically intend a remote/shared instance and
+plan to restrict access with your own firewall rule; this tool does not
+do that for you.
+EOF
+}
+
+[[ $# -ge 1 ]] || { usage; exit 1; }
+cmd="$1"
+shift
+
+load_hosts_conf "$ROOT/hosts.conf"
+
+host=""
+listen="127.0.0.1:5959"
+purge="false"
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--host) host="$2"; shift 2 ;;
+	--listen) listen="$2"; shift 2 ;;
+	--purge) purge="true"; shift ;;
+	*) fatal "unrecognized argument: $1" ;;
+	esac
+done
+
+[[ -n "$host" ]] || fatal "--host is required"
+
+case "$cmd" in
+up)
+	veilid_up "$host" "$listen"
+	;;
+status)
+	veilid_status "$host"
+	;;
+down)
+	veilid_down "$host" "$purge"
+	;;
+*)
+	usage
+	fatal "unknown command: $cmd"
+	;;
+esac

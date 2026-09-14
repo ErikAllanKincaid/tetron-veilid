@@ -1,0 +1,9 @@
+# Single source of truth for the upstream veilid commit/tag this addon
+# builds. Bumped deliberately, never auto-tracked against upstream `main`
+# -- same discipline tetron core's own veilid-transport/Cargo.toml applies
+# to its `veilid-core = "0.5.7"` dependency pin. Matches that version
+# exactly so a tetron-veilid-built server speaks the same protocol version
+# tetron's embedded transport already proved works.
+#
+# Format: a tag name resolvable in https://gitlab.com/veilid/veilid.git
+VEILID_REF=v0.5.7

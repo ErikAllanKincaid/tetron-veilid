@@ -1,0 +1,158 @@
+name: Release
+
+# Continuous releases: pushing a tag like `v0.1.0` builds veilid-server
+# from the upstream commit/tag pinned in VEILID_PIN, with
+# --features footgun-nodeid-target enabled (the one thing the officially
+# distributed apt package does not have -- see
+# tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md section 1b),
+# and publishes Linux binaries for the same two targets tetron core's own
+# release.yml uses (see that file for the native-arm64-runner precedent
+# this mirrors). Can also be run manually from the Actions tab.
+#
+# This is a real build pipeline, not a fetch-and-repackage script --
+# unlike tetron-relay (which just downloads iroh's own prebuilt
+# iroh-relay binary), upstream veilid does not publish a
+# footgun-nodeid-target build anywhere.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: false
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.extract_version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: extract_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            echo "no tag available (not a tag push, and no workflow_dispatch tag input given)" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create Git tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag -a "${{ steps.extract_version.outputs.tag }}" -m "Release ${{ steps.extract_version.outputs.tag }}" 2>/dev/null || true
+          git push origin "${{ steps.extract_version.outputs.tag }}" 2>/dev/null || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native GitHub-hosted runners per arch, same precedent as
+          # tetron core's own release.yml (ubuntu-22.04-arm) -- avoids
+          # cross-compiling a workspace with a build.rs and no confirmed
+          # cross-toolchain story of its own.
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            name: tetron-veilid-server-linux-x86_64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-22.04-arm
+            name: tetron-veilid-server-linux-aarch64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout tetron-veilid
+        uses: actions/checkout@v4
+
+      - name: Read VEILID_PIN
+        id: pin
+        run: |
+          # shellcheck source=/dev/null
+          source VEILID_PIN
+          [ -n "${VEILID_REF:-}" ] || { echo "VEILID_PIN did not set VEILID_REF" >&2; exit 1; }
+          echo "veilid_ref=$VEILID_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout upstream veilid at the pinned ref
+        run: |
+          git clone --depth 1 --branch "${{ steps.pin.outputs.veilid_ref }}" \
+            https://gitlab.com/veilid/veilid.git veilid-src
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: veilid-src
+          shared-key: "tetron-veilid-release-${{ matrix.target }}"
+          cache-on-failure: true
+
+      # No cross-toolchain/musl-tools step: the built binary at v0.5.7 was
+      # confirmed live (2026-09-14, this session) to link only against
+      # libgcc_s/libm/libc (`ldd`) -- no libssl, no dbus, nothing beyond
+      # what a bare `ubuntu-*` runner already has. Re-verify this if
+      # VEILID_PIN is ever bumped to a version with a different dependency
+      # tree; add whatever apt packages a failed build here reports
+      # missing, do not pre-install a large speculative list.
+      - name: Build veilid-server with footgun-nodeid-target
+        working-directory: veilid-src
+        run: cargo build --release --target ${{ matrix.target }} -p veilid-server --features footgun-nodeid-target
+
+      - name: Package for release
+        run: |
+          BINARY=veilid-src/target/${{ matrix.target }}/release/veilid-server
+          ASSET="${{ matrix.name }}-${{ needs.create-release.outputs.tag }}+veilid-${{ steps.pin.outputs.veilid_ref }}.tar.gz"
+          mkdir -p pkg
+          # Renamed to tetron-veilid-server inside the tarball -- the
+          # install side (lib/veilid.sh) installs it as
+          # /usr/local/bin/tetron-veilid-server, distinct from a stock
+          # distro-packaged /usr/bin/veilid-server on the same box.
+          cp "$BINARY" pkg/tetron-veilid-server
+          tar -C pkg -czf "$ASSET" tetron-veilid-server
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "$ASSET" > "$ASSET.sha256"
+          else
+            shasum -a 256 "$ASSET" > "$ASSET.sha256"
+          fi
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-release.outputs.tag }}
+          body: |
+            Built from upstream veilid `${{ steps.pin.outputs.veilid_ref }}`
+            (https://gitlab.com/veilid/veilid) with `--features footgun-nodeid-target`
+            enabled -- the officially distributed apt package does not have this
+            feature, which tetron's external-daemon Veilid transport requires for
+            `SafetySelection::Unsafe` to work at all. See
+            tetron/DO-NOT-COMMIT/PLAN_TetronVeilidAddon_Scope.md for the full
+            rationale.
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256

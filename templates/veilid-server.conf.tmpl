@@ -1,0 +1,60 @@
+# Rendered by tetron-veilid -- do not hand-edit, re-run `tetron-veilid up`
+# instead (a hand edit is overwritten on the next render).
+#
+# Based on upstream veilid v0.5.7's own packaged default
+# (package/linux/veilid-server.conf, read directly from
+# https://gitlab.com/veilid/veilid at that tag), with two deliberate
+# changes:
+#
+# 1. A `client_api:` block is added at all -- upstream's own packaged
+#    config ships with none, which defaults to IPC-only
+#    (`ipc_enabled: true`, `network_enabled: false`). Confirmed live
+#    against a real installed 0.5.7 binary
+#    (tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md, section
+#    1): the documented `client_api.enabled` key does not exist in the
+#    real `ClientApi` struct at all, so setting it silently does nothing.
+#    `network_enabled: true` is the actual switch.
+# 2. `listen_address` defaults to loopback-only
+#    (__LISTEN_ADDRESS__), not upstream's own docs example of
+#    `0.0.0.0:5959`. The wire protocol carries no authentication of any
+#    kind (confirmed live, same results doc, section 3) -- a
+#    tetron-veilid instance is meant to run as a local companion to a
+#    tetron daemon on the same host, the same relationship tetron's
+#    --tor support already has to a local Tor ControlPort, not a
+#    shared, network-reachable service. Widen this only if you
+#    specifically intend a remote/shared instance and understand there
+#    is no credential protecting it -- restrict with a firewall rule in
+#    that case, this config will not do it for you.
+#
+# All storage paths point under tetron-veilid's own state directory
+# rather than upstream's /var/db/veilid-server, so this can coexist on a
+# box that also happens to run the unrelated, distro-packaged
+# veilid-server for something else.
+
+---
+logging:
+  system:
+    enabled: true
+    level: info
+  terminal:
+    enabled: false
+core:
+  network:
+    protocol:
+      udp:
+        listen_address: ':5150'
+      tcp:
+        listen_address: ':5150'
+      ws:
+        listen_address: ':5150'
+      wss:
+        listen_address: ':5150'
+  protected_store:
+    directory: '/var/lib/tetron-veilid/protected_store'
+  table_store:
+    directory: '/var/lib/tetron-veilid/table_store'
+  block_store:
+    directory: '/var/lib/tetron-veilid/block_store'
+client_api:
+  network_enabled: true
+  listen_address: '__LISTEN_ADDRESS__'

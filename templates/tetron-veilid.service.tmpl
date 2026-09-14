@@ -1,0 +1,53 @@
+# /etc/systemd/system/tetron-veilid.service
+#
+# Hardening carried over from upstream veilid's own unit
+# (package/systemd/veilid-server.service at v0.5.7, read directly from
+# https://gitlab.com/veilid/veilid) -- inherited, not loosened. Only the
+# binary path, config path, state directory, and user/group are
+# tetron-veilid's own (dedicated `tetron-veilid` system user, distinct
+# from upstream's own `veilid` user, so this coexists with an unrelated
+# distro-packaged veilid-server on the same box without collision).
+
+[Unit]
+Description=tetron-veilid (footgun-nodeid-target build of veilid-server, for tetron's external-daemon Veilid transport)
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=RUST_BACKTRACE=1
+ExecStart=/usr/local/bin/tetron-veilid-server --config-file /etc/tetron-veilid/veilid-server.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+WorkingDirectory=/
+User=tetron-veilid
+Group=tetron-veilid
+UMask=0002
+
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+PrivateUsers=true
+ProtectHome=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ReadWritePaths=/var/lib/tetron-veilid
+ConfigurationDirectory=tetron-veilid
+StateDirectory=tetron-veilid
+
+RestrictRealtime=true
+SystemCallArchitectures=native
+LockPersonality=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
