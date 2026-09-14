@@ -3,7 +3,7 @@
 #
 # Based on upstream veilid v0.5.7's own packaged default
 # (package/linux/veilid-server.conf, read directly from
-# https://gitlab.com/veilid/veilid at that tag), with two deliberate
+# https://gitlab.com/veilid/veilid at that tag), with three deliberate
 # changes:
 #
 # 1. A `client_api:` block is added at all -- upstream's own packaged
@@ -14,7 +14,17 @@
 #    1): the documented `client_api.enabled` key does not exist in the
 #    real `ClientApi` struct at all, so setting it silently does nothing.
 #    `network_enabled: true` is the actual switch.
-# 2. `listen_address` defaults to loopback-only
+# 2. `ipc_enabled: false` -- explicitly disabled, not left at its
+#    `true` default. Confirmed live (2026-09-14, a real systemd run):
+#    leaving it enabled makes the binary also try to create its default
+#    IPC socket directory under the running user's home
+#    (`~/.local/share/veilid/ipc`), which crashes outright
+#    ("unable to create default IPC directory") under the dedicated
+#    `tetron-veilid` system user, which has no home directory
+#    (`useradd --no-create-home`). tetron-veilid only ever talks over
+#    the TCP `client_api`, so IPC is simply turned off rather than
+#    working around the home-directory requirement.
+# 3. `listen_address` defaults to loopback-only
 #    (__LISTEN_ADDRESS__), not upstream's own docs example of
 #    `0.0.0.0:5959`. The wire protocol carries no authentication of any
 #    kind (confirmed live, same results doc, section 3) -- a
@@ -56,5 +66,6 @@ core:
   block_store:
     directory: '/var/lib/tetron-veilid/block_store'
 client_api:
+  ipc_enabled: false
   network_enabled: true
   listen_address: '__LISTEN_ADDRESS__'

@@ -28,14 +28,33 @@ tv_arch_asset() {
 	esac
 }
 
-# tv_install_binary <host>
+# tv_install_binary <host> [local_binary_path]
 # Downloads and installs the latest tetron-veilid-server release tarball
 # matching the target's arch, verifying its published sha256. Fetched
 # directly on the target (needs outbound internet either way, to reach
 # the real public Veilid network once running) rather than shipped
 # through the controller.
+#
+# If local_binary_path is given, skips the GitHub Releases fetch entirely
+# and installs that local file instead -- for the dev loop this addon
+# does not have a release for yet (build locally, verify end to end,
+# *then* cut a release; see tetron/DO-NOT-COMMIT/PLAN_TetronVeilidAddon_Scope.md),
+# and for anyone who built their own binary for any other reason (a
+# different VEILID_PIN, a platform CI does not cover). Not a fallback for
+# a broken release fetch -- an explicit, deliberate opt-in via `--binary-path`.
 tv_install_binary() {
-	local host="$1"
+	local host="$1" local_binary_path="${2:-}"
+
+	if [[ -n "$local_binary_path" ]]; then
+		[[ -f "$local_binary_path" ]] || fatal "tv_install_binary: local binary not found: $local_binary_path"
+		log_info "installing local binary '$local_binary_path' on '$host' (skipping GitHub release fetch)"
+		upload_to "$host" "$local_binary_path" "/tmp/tetron-veilid-server"
+		run_on "$host" "sudo install -m 0755 /tmp/tetron-veilid-server '$TV_BIN_PATH' && rm -f /tmp/tetron-veilid-server" \
+			|| fatal "tv_install_binary: failed to install local binary on '$host'"
+		run_on "$host" "test -x '$TV_BIN_PATH'" || fatal "tv_install_binary: '$TV_BIN_PATH' not found or not executable on '$host' after install"
+		return
+	fi
+
 	local arch
 	arch="$(tv_arch_asset "$host")"
 
@@ -108,10 +127,10 @@ tv_install_unit() {
 
 # veilid_up <host> <listen_address>
 veilid_up() {
-	local host="$1" listen_address="$2"
+	local host="$1" listen_address="$2" local_binary_path="${3:-}"
 	log_info "bringing up tetron-veilid on '$host' (listen: $listen_address)"
 	tv_create_user "$host"
-	tv_install_binary "$host"
+	tv_install_binary "$host" "$local_binary_path"
 	tv_install_config "$host" "$listen_address"
 	tv_install_unit "$host"
 	run_on "$host" "sudo systemctl enable --now tetron-veilid.service" \

@@ -15,7 +15,7 @@ require_cmd curl ssh scp
 usage() {
 	cat <<'EOF'
 usage:
-  tetron-veilid up --host <name> [--listen <addr:port>]
+  tetron-veilid up --host <name> [--listen <addr:port>] [--binary-path <file>]
   tetron-veilid status --host <name>
   tetron-veilid down --host <name> [--purge]
 
@@ -31,6 +31,11 @@ tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md section 3) --
 only widen this if you specifically intend a remote/shared instance and
 plan to restrict access with your own firewall rule; this tool does not
 do that for you.
+
+--binary-path installs a local tetron-veilid-server binary instead of
+fetching the latest GitHub release -- for the dev loop before a release
+exists (build locally, verify, then release), or a binary built for a
+different VEILID_PIN/platform than CI covers.
 EOF
 }
 
@@ -43,12 +48,14 @@ load_hosts_conf "$ROOT/hosts.conf"
 host=""
 listen="127.0.0.1:5959"
 purge="false"
+binary_path=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--host) host="$2"; shift 2 ;;
 	--listen) listen="$2"; shift 2 ;;
 	--purge) purge="true"; shift ;;
+	--binary-path) binary_path="$2"; shift 2 ;;
 	*) fatal "unrecognized argument: $1" ;;
 	esac
 done
@@ -57,7 +64,7 @@ done
 
 case "$cmd" in
 up)
-	veilid_up "$host" "$listen"
+	veilid_up "$host" "$listen" "$binary_path"
 	;;
 status)
 	veilid_status "$host"

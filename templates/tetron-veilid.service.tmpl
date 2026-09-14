@@ -42,6 +42,11 @@ ProtectProc=invisible
 ProtectSystem=strict
 ReadWritePaths=/var/lib/tetron-veilid
 ConfigurationDirectory=tetron-veilid
+# Matches the 0750 mode tv_create_user's own `install -d` already uses --
+# without this, systemd warns (harmlessly, but confirmed live 2026-09-14)
+# that the pre-existing directory's mode (750) differs from
+# ConfigurationDirectory='s own default (755).
+ConfigurationDirectoryMode=0750
 StateDirectory=tetron-veilid
 
 RestrictRealtime=true
