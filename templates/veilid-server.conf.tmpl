@@ -9,9 +9,8 @@
 # 1. A `client_api:` block is added at all -- upstream's own packaged
 #    config ships with none, which defaults to IPC-only
 #    (`ipc_enabled: true`, `network_enabled: false`). Confirmed live
-#    against a real installed 0.5.7 binary
-#    (tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md, section
-#    1): the documented `client_api.enabled` key does not exist in the
+#    against a real installed 0.5.7 binary: the documented
+#    `client_api.enabled` key does not exist in the
 #    real `ClientApi` struct at all, so setting it silently does nothing.
 #    `network_enabled: true` is the actual switch.
 # 2. `ipc_enabled: false` -- explicitly disabled, not left at its
@@ -27,7 +26,7 @@
 # 3. `listen_address` defaults to loopback-only
 #    (__LISTEN_ADDRESS__), not upstream's own docs example of
 #    `0.0.0.0:5959`. The wire protocol carries no authentication of any
-#    kind (confirmed live, same results doc, section 3) -- a
+#    kind (confirmed live) -- a
 #    tetron-veilid instance is meant to run as a local companion to a
 #    tetron daemon on the same host, the same relationship tetron's
 #    --tor support already has to a local Tor ControlPort, not a
