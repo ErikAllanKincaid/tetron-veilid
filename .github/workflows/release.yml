@@ -3,9 +3,8 @@ name: Release
 # Continuous releases: pushing a tag like `v0.1.0` builds veilid-server
 # from the upstream commit/tag pinned in VEILID_PIN, with
 # --features footgun-nodeid-target enabled (the one thing the officially
-# distributed apt package does not have -- see
-# tetron/DO-NOT-COMMIT/SPIKE_VeilidExternalDaemon_Results.md section 1b),
-# and publishes Linux binaries for the same two targets tetron core's own
+# distributed apt package does not have), and publishes Linux binaries
+# for the same two targets tetron core's own
 # release.yml uses (see that file for the native-arm64-runner precedent
 # this mirrors). Can also be run manually from the Actions tab.
 #
@@ -150,9 +149,7 @@ jobs:
             (https://gitlab.com/veilid/veilid) with `--features footgun-nodeid-target`
             enabled -- the officially distributed apt package does not have this
             feature, which tetron's external-daemon Veilid transport requires for
-            `SafetySelection::Unsafe` to work at all. See
-            tetron/DO-NOT-COMMIT/PLAN_TetronVeilidAddon_Scope.md for the full
-            rationale.
+            `SafetySelection::Unsafe` to work at all.
           files: |
             ${{ env.ASSET }}
             ${{ env.ASSET }}.sha256

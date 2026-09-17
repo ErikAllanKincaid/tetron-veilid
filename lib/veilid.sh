@@ -38,7 +38,7 @@ tv_arch_asset() {
 # If local_binary_path is given, skips the GitHub Releases fetch entirely
 # and installs that local file instead -- for the dev loop this addon
 # does not have a release for yet (build locally, verify end to end,
-# *then* cut a release; see tetron/DO-NOT-COMMIT/PLAN_TetronVeilidAddon_Scope.md),
+# *then* cut a release),
 # and for anyone who built their own binary for any other reason (a
 # different VEILID_PIN, a platform CI does not cover). Not a fallback for
 # a broken release fetch -- an explicit, deliberate opt-in via `--binary-path`.
